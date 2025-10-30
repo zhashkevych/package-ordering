@@ -97,6 +97,10 @@ func (s *Server) registerRoutes() {
 		}
 		c.JSON(http.StatusOK, resp)
 	})
+
+	// Serve static UI from ./web without conflicting with API routes
+	r.GET("/", func(c *gin.Context) { c.Redirect(http.StatusFound, "/ui/") })
+	r.Static("/ui", "./web")
 }
 
 func dedupeAndSortDesc(in []int) []int {

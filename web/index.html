@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Package Ordering</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+      h1 { margin-bottom: 8px; }
+      section { border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; margin: 16px 0; max-width: 720px; }
+      label { display: block; margin: 8px 0 4px; font-weight: 600; }
+      input[type="text"], input[type="number"] { padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
+      button { background: #10b981; color: #fff; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+      th, td { border: 1px solid #e5e5e5; padding: 8px; text-align: left; }
+      th { background: #f9fafb; }
+      .row { display: flex; gap: 12px; align-items: center; }
+      .muted { color: #6b7280; font-size: 14px; }
+      .error { color: #dc2626; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>Order Packs Calculator</h1>
+
+    <section>
+      <h2>Pack Sizes</h2>
+      <div class="muted">Comma-separated list, e.g. 250,500,1000,2000,5000</div>
+      <label for="packs-input">Pack sizes</label>
+      <input id="packs-input" type="text" placeholder="250,500,1000,2000,5000" />
+      <div class="row" style="margin-top:10px;">
+        <button id="packs-save">Save pack sizes</button>
+        <div id="packs-status" class="muted"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Calculate</h2>
+      <label for="amount-input">Items amount</label>
+      <input id="amount-input" type="number" min="1" placeholder="e.g. 501" />
+      <div class="row" style="margin-top:10px;">
+        <button id="calc-btn">Calculate</button>
+        <div id="calc-status" class="muted"></div>
+      </div>
+
+      <div id="result" style="margin-top:16px; display:none;">
+        <div id="summary" class="muted"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Pack</th>
+              <th>Quantity</th>
+            </tr>
+          </thead>
+          <tbody id="result-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <script>
+      async function fetchPacks() {
+        try {
+          const res = await fetch('/packs');
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          const packs = data.packSizes || [];
+          document.getElementById('packs-input').value = packs.join(',');
+        } catch (e) {
+          document.getElementById('packs-status').textContent = 'Failed to load packs';
+        }
+      }
+
+      async function savePacks() {
+        const status = document.getElementById('packs-status');
+        status.textContent = '';
+        const raw = document.getElementById('packs-input').value;
+        const parts = raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n > 0);
+        if (parts.length === 0) { status.textContent = 'Enter at least one positive number'; return; }
+        try {
+          const res = await fetch('/packs', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packSizes: parts }) });
+          if (!res.ok) throw new Error(await res.text());
+          status.textContent = 'Saved!';
+        } catch (e) {
+          status.textContent = 'Save failed';
+        }
+      }
+
+      async function calculate() {
+        const status = document.getElementById('calc-status');
+        status.textContent = '';
+        const amount = parseInt(document.getElementById('amount-input').value, 10);
+        if (!Number.isFinite(amount) || amount <= 0) { status.textContent = 'Enter a positive amount'; return; }
+        try {
+          const res = await fetch('/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) });
+          if (!res.ok) { status.textContent = 'Calculation failed'; return; }
+          const data = await res.json();
+          const tbody = document.getElementById('result-body');
+          tbody.innerHTML = '';
+          const entries = Object.entries(data.allocation).sort((a,b) => Number(b[0]) - Number(a[0]));
+          for (const [pack, qty] of entries) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${pack}</td><td>${qty}</td>`;
+            tbody.appendChild(tr);
+          }
+          const summary = document.getElementById('summary');
+          summary.textContent = `Total items: ${data.totalItems} | Overfill: ${data.totalItems - data.amount} | Packs: ${data.totalPacks}`;
+          document.getElementById('result').style.display = 'block';
+        } catch (e) {
+          status.textContent = 'Calculation failed';
+        }
+      }
+
+      document.getElementById('packs-save').addEventListener('click', savePacks);
+      document.getElementById('calc-btn').addEventListener('click', calculate);
+      fetchPacks();
+    </script>
+  </body>
+  </html>
+
+
