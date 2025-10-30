@@ -1,0 +1,18 @@
+# Go build cache
+**/.git
+**/.gitignore
+**/.DS_Store
+**/dist
+**/build
+**/.vscode
+**/*.log
+
+# Go
+bin
+vendor
+*.test
+coverage*
+
+# Exclude local artifacts
+.env*
+
